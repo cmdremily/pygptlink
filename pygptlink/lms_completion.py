@@ -7,7 +7,6 @@ from pygptlink.gpt_tool_definition import GPTToolDefinition
 from pygptlink.gpt_logging import logger
 from pygptlink.sentenceextractor import SentenceExtractor
 
-
 import lmstudio as lms
 
 
@@ -62,13 +61,12 @@ class LMSCompletion:
 
         # Prepare arguments for completion
         # Load model first so the token count will work
-        model = lms.llm(context.model, config={
-            "contextLength": context.max_tokens,
-            "gpuOffload": {
-                "ratio": 0.65,
-                "splitStrategy": "favorMainGpu"
-            }
-        })
+        config = lms.LlmLoadModelConfig()
+        config.context_length = context.max_tokens
+        config.flash_attention = False
+        config.try_mmap = False
+
+        model = lms.llm(context.model, config=config)
         tool_tokens = num_tokens_for_tools(
             functions=tool_defs, model=context.model)
         messages = context.lms_messages(sticky_system_message=extra_system_prompt,
