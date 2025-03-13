@@ -10,4 +10,10 @@ setup(
     python_requires=">=3.11",
     include_package_data=True,
     package_data={"pytils": ["py.typed"]},
+    install_requires=[
+        'openai~=1.4.0',
+        'jsonlines~=4.0.0',
+        'tiktoken~=0.7.0',
+        'lmstudio~=1.0.1',
+    ],
 )
