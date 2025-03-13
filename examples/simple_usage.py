@@ -52,7 +52,7 @@ async def main():
     print(f"Assistant: {response}")
 
     print("\nFull context:")
-    pprint.pprint(context.messages())
+    pprint.pprint(context.oai_messages())
 
 if __name__ == "__main__":
     asyncio.run(main())

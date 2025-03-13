@@ -1,3 +1,4 @@
+from typing import Any, Generator
 from pygptlink.gpt_logging import logger
 import tiktoken
 import lmstudio as lms
@@ -73,11 +74,11 @@ def tool_token_constants(model: str) -> tuple[int, int, int, int, int, int]:
     return func_init, prop_init, prop_key, enum_init, enum_item, func_end
 
 
-def num_tokens_for_messages(messages: list[dict], model: str) -> int:
+def num_tokens_for_messages(messages: list[dict[str, Any]] | lms.Chat, model: str) -> int:
     loaded = {k.get_info().model_key for k in lms.list_loaded_models("llm")}
     if model in loaded:
         llm = lms.llm(model)
-        formatted = llm.apply_prompt_template({"messages": messages})
+        formatted = llm.apply_prompt_template(history={"messages": messages})
         return len(llm.tokenize(formatted))
 
     try:
@@ -88,7 +89,7 @@ def num_tokens_for_messages(messages: list[dict], model: str) -> int:
 
     tokens_per_message, tokens_per_name = message_token_constants(model)
 
-    def recursive_iterate(dictionary):
+    def recursive_iterate(dictionary: dict[Any, Any]) -> Generator[Any | tuple[Any, Any], Any, None]:
         for key, value in dictionary.items():
             if isinstance(value, dict):
                 yield from recursive_iterate(value)
@@ -111,7 +112,10 @@ def num_tokens_for_messages(messages: list[dict], model: str) -> int:
     return num_tokens
 
 
-def num_tokens_for_tools(functions, model) -> int:
+def num_tokens_for_tools(functions: list[dict[str, Any]] | None, model: str) -> int:
+    if not functions:
+        return 0
+
     loaded = {k.get_info().model_key for k in lms.list_loaded_models("llm")}
     if model in loaded:
         return 0

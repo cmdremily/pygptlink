@@ -77,7 +77,7 @@ class GPTCompletion:
         # Prepare arguments for completion
         tool_tokens = num_tokens_for_tools(
             functions=tool_defs, model=context.model)
-        messages = context.messages(
+        messages = context.oai_messages(
             sticky_system_message=extra_system_prompt, reserved_tokens=tool_tokens)
         logger.debug(f"Prompting with: {messages}")
 

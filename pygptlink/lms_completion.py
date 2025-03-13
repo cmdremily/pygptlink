@@ -1,9 +1,7 @@
 import asyncio
 from collections.abc import Callable
-from typing import Any, Optional
 
 from pygptlink.gpt_context import GPTContext
-from pygptlink.gpt_no_response_desired import GPTNoResponseDesired
 from pygptlink.gpt_tokens import num_tokens_for_tools
 from pygptlink.gpt_tool_definition import GPTToolDefinition
 from pygptlink.gpt_logging import logger
@@ -45,11 +43,10 @@ class LMSCompletion:
         """
 
         tools_map = {tool.name: tool for tool in tools}
-        completion_settings = {
-            "maxTokens": context.max_response_tokens,
-            "temperature": 0.4,
-            "cpuThreads": 20,
-        }
+        completion_settings = lms.LlmPredictionConfig()
+        completion_settings.max_tokens = context.max_response_tokens
+        completion_settings.temperature = 0.4
+        completion_settings.cpu_threads = 20
 
         if allowed_tools == None:
             tool_defs = [
@@ -63,27 +60,19 @@ class LMSCompletion:
             tool_defs = [tools_map[tool_name].describe()
                          for tool_name in allowed_tools]
 
-        if isinstance(force_tool, bool) and force_tool:
-            tool_choice = "required"
-            if not tool_defs:
-                raise ValueError(
-                    "Tool call forced but no tools allowed or available!")
-        else:
-            tool_choice = "auto" if tools_map else None
-
         # Prepare arguments for completion
         # Load model first so the token count will work
         model = lms.llm(context.model, config={
             "contextLength": context.max_tokens,
             "gpuOffload": {
-                "ratio": 1.0,
+                "ratio": 0.65,
                 "splitStrategy": "favorMainGpu"
             }
         })
         tool_tokens = num_tokens_for_tools(
             functions=tool_defs, model=context.model)
-        messages = context.messages(
-            sticky_system_message=extra_system_prompt, reserved_tokens=tool_tokens, lms=True)
+        messages = context.lms_messages(sticky_system_message=extra_system_prompt,
+                                        reserved_tokens=tool_tokens)
 
         def on_fragment(fragment: lms.LlmPredictionFragment, round_index: int = 0):
             if callback:
@@ -95,7 +84,7 @@ class LMSCompletion:
 
         logger.debug(f"Prompting {model} with: {messages}")
 
-        result = model.respond(history={"messages": messages}, config=completion_settings,
+        result = model.respond(messages, config=completion_settings,
                                on_prediction_fragment=on_fragment, on_message=on_message)
         if callback:
             callback("", True)

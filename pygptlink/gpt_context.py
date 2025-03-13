@@ -5,11 +5,14 @@ from typing import Any
 from uuid import uuid4
 
 import jsonlines
-from lmstudio import AssistantResponse, ToolResultMessage
+from lmstudio import AssistantResponse, Chat, ChatHistoryDataDict, ToolResultMessage
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from pygptlink.gpt_logging import logger
 from pygptlink.gpt_tokens import num_tokens_for_messages
+
+
+import lmstudio as lms
 
 
 class GPTContext:
@@ -56,6 +59,7 @@ class GPTContext:
                         file.readline()  # Discard until next endline.
                     with jsonlines.Reader(file) as reader:
                         for message in reader.iter():
+                            assert isinstance(message, dict)
                             self.context.append(message)
             except FileNotFoundError:
                 logger.warning(
@@ -78,12 +82,13 @@ class GPTContext:
             with open(self.completion_log_file, 'a', encoding='utf-8') as file:
                 file.write(msg.__str__() + '\n')
 
-        message: dict = {"role": msg.role}
+        message: dict[str, Any] = {"role": msg.role}
         if isinstance(msg, ToolResultMessage):
             # This is a bit special, to maintain compatibility we need to split these into multiple
             # messages.
             for content in msg.content:
                 assert content.type == "toolCallResult"
+                assert content.tool_call_id
                 self.__append_message(message={"role": msg.role,
                                                "tool_call_id": content.tool_call_id,
                                                "content": content.content})
@@ -93,7 +98,7 @@ class GPTContext:
             if content.type == "text":
                 message['content'] = content.text
             elif content.type == "toolCallRequest":
-                tools: list = message.setdefault("tool_calls", [])
+                tools: list[dict[str, Any]] = message.setdefault("tool_calls", [])
                 tools.append(
                     {
                         "id": content.tool_call_request.id,
@@ -185,7 +190,7 @@ class GPTContext:
         """
         self.__append_message(self.__system_message(content))
 
-    def messages(self, sticky_system_message: str | None = None, reserved_tokens: int = 0, lms: bool = False) -> list[dict]:
+    def lms_messages(self, sticky_system_message: str | None = None, reserved_tokens: int = 0) -> ChatHistoryDataDict:
         """Generates a list of dicts that can be passed to OpenAIs completion API.
 
         There is usually no need to call this directly.
@@ -205,52 +210,77 @@ class GPTContext:
         else:
             persona = None
 
-        if lms:
-            # TODO: LMStudio doesn't support consecutive assistant messages, we should attempt to detect and merge them.
-            messages = [m for m in self.context]
-            available_tokens = self.max_tokens - self.max_response_tokens - reserved_tokens
-            while len(messages) and (messages[0]["role"] == "tool" or num_tokens_for_messages(messages, self.model) > available_tokens):
+         # TODO: LMStudio doesn't support consecutive assistant messages, we should attempt to detect and merge them.
+        messages = [m for m in self.context]
+        available_tokens = self.max_tokens - self.max_response_tokens - reserved_tokens
+        while len(messages) and (messages[0]["role"] == "tool" or num_tokens_for_messages(messages, self.model) > available_tokens):
+            if len(self.context) > 0:
+                self.context.pop(0)
+            messages.pop(0)
+
+        # LMStudio doesn't support multiple system prompts, we combine sticky system and persona.
+        merged_system = ((persona or "") + "\n\n" +
+                         (sticky_system_message or "")).strip()
+        if merged_system:
+            sys_msg = self.__system_message(merged_system)
+            while len(messages) and (messages[0]["role"] == "tool" or num_tokens_for_messages([sys_msg] + messages, self.model) > available_tokens):
                 if len(self.context) > 0:
                     self.context.pop(0)
                 messages.pop(0)
+            messages = [sys_msg] + messages
 
-            # LMStudio doesn't support multiple system prompts, we combine sticky system and persona.
-            merged_system = ((persona or "") + "\n\n" +
-                             (sticky_system_message or "")).strip()
-            if merged_system:
-                sys_msg = self.__system_message(merged_system)
-                while len(messages) and (messages[0]["role"] == "tool" or num_tokens_for_messages([sys_msg] + messages, self.model) > available_tokens):
-                    if len(self.context) > 0:
-                        self.context.pop(0)
-                    messages.pop(0)
-                messages = [sys_msg] + messages
+        for msg in messages:
+            if not msg['content']:
+                raise ValueError("Empty content in context!")
+
+        return ChatHistoryDataDict(messages=messages) # type: ignore
+
+    def oai_messages(self, sticky_system_message: str | None = None, reserved_tokens: int = 0, lms: bool = False) -> list[dict[str, str]]:
+        """Generates a list of dicts that can be passed to OpenAIs completion API.
+
+        There is usually no need to call this directly.
+
+        Args:
+            sticky_system_message (str, optional): The following text will be included as a system message early in the output messages but without adding it to the context. Use this for important system messages that should never "roll off" the context window or that you need to provide but don't want in the context permanently. Defaults to None.
+
+        Returns:
+            list[dict]: A "messages" structure, a list of "message" dicts.
+        """
+        assert sticky_system_message == None or isinstance(
+            sticky_system_message, str)
+
+        if self.persona_file:
+            with open(self.persona_file, 'r') as file:
+                persona = file.read()
         else:
-            # Find split point
-            left_split = []
-            right_split = []
-            for entry in reversed(self.context):
-                entry = self.__strip_internal_tags(entry)
-                if not right_split:
-                    right_split.append(entry)
-                elif right_split[-1]["role"] == "tool":
-                    right_split.append(entry)
-                else:
-                    left_split.append(entry)
-            right_split.reverse()
-            left_split.reverse()
+            persona = None
 
-            messages = left_split
-            if persona:
-                messages.append(self.__system_message(persona))
-            if sticky_system_message:
-                messages.append(self.__system_message(sticky_system_message))
-            messages += right_split
+        # Find split point
+        left_split: list[dict[str, str]] = []
+        right_split: list[dict[str, str]] = []
+        for entry in reversed(self.context):
+            entry = self.__strip_internal_tags(entry)
+            if not right_split:
+                right_split.append(entry)
+            elif right_split[-1]["role"] == "tool":
+                right_split.append(entry)
+            else:
+                left_split.append(entry)
+        right_split.reverse()
+        left_split.reverse()
 
-            available_tokens = self.max_tokens - self.max_response_tokens - reserved_tokens
-            while len(messages) and (messages[0]["role"] == "tool" or num_tokens_for_messages(messages, self.model) > available_tokens):
-                if len(self.context) > 0:
-                    self.context.pop(0)
-                messages.pop(0)
+        messages = left_split
+        if persona:
+            messages.append(self.__system_message(persona))
+        if sticky_system_message:
+            messages.append(self.__system_message(sticky_system_message))
+        messages += right_split
+
+        available_tokens = self.max_tokens - self.max_response_tokens - reserved_tokens
+        while len(messages) and (messages[0]["role"] == "tool" or num_tokens_for_messages(messages, self.model) > available_tokens):
+            if len(self.context) > 0:
+                self.context.pop(0)
+            messages.pop(0)
 
         for msg in messages:
             if not msg['content']:
@@ -265,10 +295,10 @@ class GPTContext:
         if self.context_file and os.path.exists(self.context_file):
             os.remove(self.context_file)
 
-    def __strip_internal_tags(self, message: dict[str, Any]) -> dict[str, Any]:
+    def __strip_internal_tags(self, message: dict[str, str]) -> dict[str, str]:
         return {k: v for k, v in message.items() if k != "msg_id" and k != "msg_timestamp"}
 
-    def __append_message(self, message):
+    def __append_message(self, message: dict[str, str]):
         message["msg_id"] = str(uuid4())
         message["msg_timestamp"] = datetime.now(tz=timezone.utc).isoformat()
         self.context.append(message)
