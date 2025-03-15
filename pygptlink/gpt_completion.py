@@ -48,10 +48,11 @@ class GPTCompletion:
         """
 
         tools_map = {tool.name: tool for tool in tools}
-        completion_settings = {
+        completion_settings: dict[str, Any] = {
             'model': context.model,
             'max_tokens': context.max_response_tokens,
             'stream': True,
+            'temperature': context.temperature,
         }
 
         if allowed_tools == None:
@@ -66,7 +67,7 @@ class GPTCompletion:
             tool_defs = [tools_map[tool_name].describe()
                          for tool_name in allowed_tools]
 
-        if isinstance(force_tool, bool) and force_tool:
+        if force_tool:
             tool_choice = "required"
             if not tool_defs:
                 raise ValueError(

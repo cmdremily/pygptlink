@@ -22,7 +22,7 @@ class GPTContext:
     """
 
     def __init__(self, model: str, max_tokens: int, max_response_tokens: int, persona_file: str | Path | None = None,
-                 context_file: str | Path | None = None, completion_log_file: str | Path | None = None) -> None:
+                 context_file: str | Path | None = None, completion_log_file: str | Path | None = None, temperature: float | None = None) -> None:
         """Creates a new GPTContext.
 
         The `max_tokens` and `max_response_tokens` parameters are interdependent. The total number of tokens that can be returned from messages() is `max_tokens - max_response_tokens`. This is designed to prevent the response from being prematurely truncated due to the max token limit.
@@ -34,12 +34,14 @@ class GPTContext:
             persona_file (Optional[str], optional): This file includes text that primes the agent to behave in a specific way. If no value is provided, it defaults to None and the model behaves like a "helpful AI assistant".
             context_file (Optional[str], optional): Contains a JSONL file with past messages. It's used to maintain the persisting context and can also aid in post-processing the potentially extensive history for fine-tuning. If not specified, defaults to None and means that the context is not persisted on disk.
             completion_log_file (Optional[str], optional): This debug log contains all received and sent message objects. Unlike the context file, it holds the full completion response instead of just the necessary parts for the next chat completion. Defaults to None if left unspecified.
+            temperature (Optional[float], optional): The sampling temperature [0.0, 1.0] lower is more deterministic output. Null for model default.
         """
         self.model = model
         self.persona_file = persona_file
         self.completion_log_file = completion_log_file or None
         self.max_tokens = max_tokens
         self.max_response_tokens = max_response_tokens
+        self.temperature = temperature
 
         self.context: list[dict[str, Any]] = []
         self.context_file = context_file or None
@@ -233,7 +235,7 @@ class GPTContext:
             if not msg['content']:
                 raise ValueError("Empty content in context!")
 
-        return ChatHistoryDataDict(messages=messages) # type: ignore
+        return ChatHistoryDataDict(messages=messages)  # type: ignore
 
     def oai_messages(self, sticky_system_message: str | None = None, reserved_tokens: int = 0, lms: bool = False) -> list[dict[str, str]]:
         """Generates a list of dicts that can be passed to OpenAIs completion API.

@@ -44,7 +44,7 @@ class LMSCompletion:
         tools_map = {tool.name: tool for tool in tools}
         completion_settings = lms.LlmPredictionConfig()
         completion_settings.max_tokens = context.max_response_tokens
-        completion_settings.temperature = 0.4
+        completion_settings.temperature = context.temperature
         completion_settings.cpu_threads = 20
 
         if allowed_tools == None:
