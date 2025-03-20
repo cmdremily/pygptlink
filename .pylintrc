@@ -1,0 +1,76 @@
+[MASTER]
+# Specify the Python version you're using
+python_version=3.11  # Adjust this to your Python version
+
+# Disable the message types that you want to allow
+disable=missing-docstring,invalid-name
+
+[MESSAGES CONTROL]
+# Enable maximum warning types (you can disable specific ones below if you prefer)
+enable=all  # Enable all warnings, by default
+
+# Treat all issues as errors (this is like -Wextra, everything triggers a message)
+# This will make Pylint output as many messages as possible to help catch issues
+#max-line-length=88  # Keep to the common standard for Python
+
+#[FORMAT]
+# Code formatting rules (optional, but let's enforce them here)
+#max-line-length=88  # Standard 88 character line length (consistent with Black)
+#indent-string='    '  # 4 spaces for indentation, no tabs
+#docstring-style=google  # Enforce the Google style for docstrings (use this or reStructuredText)
+
+[LOGGING]
+# Ensure proper logging practices
+logging-modules=logging  # Only allow 'logging' as a valid logging module
+
+[REPORTS]
+# Controls how many reports you want
+output-format=text
+# This disables the report at the end (you just want warnings/errors)
+
+[VARIABLES]
+# Disallow the use of variables that start with an underscore (unless explicitly exempt)
+# These variables should be used for special purposes (e.g., private members, private methods)
+# so if they are used incorrectly, you get an alert.
+bad-names=foo,bar,baz
+good-names=i,j,k,x,y,z,ex,Run,_
+
+[DESIGN]
+# Disallow too complex functions
+max-args=5  # Limit the number of function arguments
+max-locals=15  # Limit the number of local variables in a function
+max-returns=5  # Limit the number of return statements in a function
+max-branches=12  # Limit the number of branches (e.g., if/else) in a function
+
+# Disallow functions with too many statements
+max-statements=30  # Maximum number of statements in a function
+
+[CLASS NAMES]
+# Enforce class naming conventions
+class-naming-style=PascalCase  # Classes should be in CapitalizedWords style
+
+[FUNCTION NAMES]
+# Enforce function and method naming conventions
+function-naming-style=snake_case  # Functions should use snake_case
+method-naming-style=snake_case  # Methods should use snake_case
+
+[IMPORTS]
+# Controls how imports are handled
+# Avoid wildcard imports as they can cause namespace issues
+disable=wildcard-import
+
+# Ensure that the imports are in the right order (standard, third-party, local)
+import-order-style=google
+
+[EXCEPTIONS]
+# Disallow catching exceptions by generic names
+overgeneral-exceptions=Exception,BaseException  # Do not catch all exceptions
+
+[TYPECHECK]
+# Enable strong type checking
+# Disallow undefined variables or types, and disallow using "Any" unless it's explicitly used
+disable=invalid-name
+ignored-classes=optparse.Option,threading._DummyThread
+
+# Catch all uses of "Any" type (if you use mypy too, this might be redundant)
+check-untyped-defs=yes

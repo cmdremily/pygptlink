@@ -21,19 +21,22 @@ $ pip install ../PyGPTLink/
 See the examples in [`examples/`](examples/).
 
 Here's an abridged, code sample taken from [`examples/simple_usage.py`](examples/simple_usage.py) to show the typical API usage:
+
 ```python
-from pygptlink.gpt_context import GPTContext
-from pygptlink.gpt_completion import GPTCompletion
+from pygptlink.context_history import ContextHistory
+from pygptlink.oai_completion import OAICompletion
+
 
 def callback(sentence: str, response_done: bool):
     print(f"Assistant: {sentence} (response_done: {response_done})")
 
+
 async def main():
     # The completion object provides the API connection and calling logic.
-    completion = GPTCompletion(api_key="YOUR API KEY")
+    completion = OAICompletion(api_key="YOUR API KEY")
 
     # The context object handles keeping track of history and remaining within the max_tokens limit.
-    context = GPTContext(model="gpt-3.5-turbo", max_tokens=1000, max_response_tokens=100)
+    context = ContextHistory(model="gpt-3.5-turbo", max_tokens=1000, max_response_tokens=100)
 
     # Prime the agent with how we want it to act.
     # Normally you'd use a persona file passed to the context.
@@ -51,6 +54,7 @@ async def main():
     print("Fluxine: Oh Gee, thanks.")
     response = await completion.complete(context=context)
     print(f"Assistant: {response}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

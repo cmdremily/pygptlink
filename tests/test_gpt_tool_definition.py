@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock
 
 from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall, ChoiceDeltaToolCallFunction
-from pygptlink.gpt_tool_definition import GPTToolDefinition
+from pygptlink.assistant_tool_definition import AssistantToolDefinition
 
 
 class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
@@ -19,8 +19,8 @@ class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
         async def callback_example(arg1: str):
             return None
 
-        tool_def = GPTToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
-                                     required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
+        tool_def = AssistantToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
+                                           required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
 
         result = await tool_def.invoke(self.valid_tool_call)
         self.assertEqual(result, "The tool call completed successfully.")
@@ -30,8 +30,8 @@ class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
         async def callback_example(arg1: str):
             return "Hello World!"
 
-        tool_def = GPTToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
-                                     required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
+        tool_def = AssistantToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
+                                           required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
 
         result = await tool_def.invoke(self.valid_tool_call)
         self.assertEqual(result, "The tool call returned: Hello World!")
@@ -41,8 +41,8 @@ class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
         async def callback_example(arg1: str):
             return f"Processed: {arg1}"
 
-        tool_def = GPTToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
-                                     required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
+        tool_def = AssistantToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
+                                           required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
 
         # Creating a tool call without the required argument
         invalid_tool_call = ChoiceDeltaToolCall(
@@ -61,8 +61,8 @@ class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
         def callback_example(arg1: str):
             raise ValueError("Example exception")
 
-        tool_def = GPTToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
-                                     required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
+        tool_def = AssistantToolDefinition(name="ExampleName", description="Example Tool", callback=callback_example,
+                                           required_args=[{"name": "arg1", "description": "Argument 1", "type": "string"}])
 
         result = await tool_def.invoke(self.valid_tool_call)
         self.assertEqual(
@@ -70,7 +70,7 @@ class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
 
     async def test_describe_with_arguments(self):
         # Example tool definition with arguments
-        tool_def = GPTToolDefinition(
+        tool_def = AssistantToolDefinition(
             name="ExampleName",
             description="Example Tool",
             callback=None,
@@ -104,7 +104,7 @@ class TestToolDefinition(unittest.IsolatedAsyncioTestCase):
 
     async def test_describe_without_arguments(self):
         # Example tool definition without arguments
-        tool_def = GPTToolDefinition(
+        tool_def = AssistantToolDefinition(
             name="ExampleName", description="Example Tool", callback=lambda: None)
 
         result = tool_def.describe()

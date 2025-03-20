@@ -1,12 +1,13 @@
+# coding=utf-8
 from typing import Any, Generator
-from pygptlink.gpt_logging import logger
+from pygptlink.logging import logger
 import tiktoken
 import lmstudio as lms
 
 # Adapted from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 
 
-def message_token_constants(model: str) -> tuple[int, int]:
+def __oai_message_token_constants(model: str) -> tuple[int, int]:
     if model in {
         "gpt-3.5-turbo-0125",
         "gpt-4-0314",
@@ -19,30 +20,22 @@ def message_token_constants(model: str) -> tuple[int, int]:
         tokens_per_message = 3
         tokens_per_name = 1
     elif "gpt-3.5-turbo" in model:
-        return message_token_constants(model="gpt-3.5-turbo-0125")
+        return __oai_message_token_constants(model="gpt-3.5-turbo-0125")
     elif "gpt-4o-mini" in model:
-        return message_token_constants(model="gpt-4o-mini-2024-07-18")
+        return __oai_message_token_constants(model="gpt-4o-mini-2024-07-18")
     elif "gpt-4o" in model:
-        return message_token_constants(model="gpt-4o-2024-08-06")
+        return __oai_message_token_constants(model="gpt-4o-2024-08-06")
     elif "gpt-4" in model:
-        return message_token_constants(model="gpt-4-0613")
+        return __oai_message_token_constants(model="gpt-4-0613")
     else:
         # Print error and assume the values are unchanged. Don't stop production just to make an uneducated guess.
         logger.error(
             f"""message_token_constants() is not implemented for model {model}, assuming same as gpt-4o.""")
-        return message_token_constants("gpt-4o")
+        return __oai_message_token_constants("gpt-4o")
     return tokens_per_message, tokens_per_name
 
 
 def tool_token_constants(model: str) -> tuple[int, int, int, int, int, int]:
-    # Initialize function settings to 0
-    func_init = 0
-    prop_init = 0
-    prop_key = 0
-    enum_init = 0
-    enum_item = 0
-    func_end = 0
-
     if model in [
         "gpt-4o",
         "gpt-4o-mini"
@@ -74,11 +67,17 @@ def tool_token_constants(model: str) -> tuple[int, int, int, int, int, int]:
     return func_init, prop_init, prop_key, enum_init, enum_item, func_end
 
 
-def num_tokens_for_messages(messages: list[dict[str, Any]] | lms.Chat, model: str) -> int:
-    loaded = {k.get_info().model_key for k in lms.list_loaded_models("llm")}
-    if model in loaded:
+def __recursive_iterate(dictionary: dict[Any, Any]) -> Generator[Any | tuple[Any, Any], Any, None]:
+    for k, v in dictionary.items():
+        if isinstance(v, dict):
+            yield from __recursive_iterate(v)
+        else:
+            yield k, v
+
+def num_tokens_for_messages(context: list[dict[str, Any]] | lms.ChatHistoryDataDict, model: str) -> int:
+    if isinstance(context, lms.ChatHistoryDataDict):
         llm = lms.llm(model)
-        formatted = llm.apply_prompt_template(history={"messages": messages})
+        formatted = llm.apply_prompt_template(history=context)
         return len(llm.tokenize(formatted))
 
     try:
@@ -87,26 +86,20 @@ def num_tokens_for_messages(messages: list[dict[str, Any]] | lms.Chat, model: st
         print("Warning: model not found. Using o200k_base encoding.")
         encoding = tiktoken.get_encoding("o200k_base")
 
-    tokens_per_message, tokens_per_name = message_token_constants(model)
+    tokens_per_message, tokens_per_name = __oai_message_token_constants(model)
 
-    def recursive_iterate(dictionary: dict[Any, Any]) -> Generator[Any | tuple[Any, Any], Any, None]:
-        for key, value in dictionary.items():
-            if isinstance(value, dict):
-                yield from recursive_iterate(value)
-            else:
-                yield key, value
 
     num_tokens = 0
-    for message in messages:
+    for message in context:
         num_tokens += tokens_per_message
-        for key, value in message.items():
-            if key == "tool_calls":
-                for tool_call in value:
-                    for key, value in recursive_iterate(tool_call):
-                        num_tokens += len(encoding.encode(value))
+        for k, v in message.items():
+            if k == "tool_calls":
+                for tool_call in v:
+                    for _, field in __recursive_iterate(tool_call):
+                        num_tokens += len(encoding.encode(field))
             else:
-                num_tokens += len(encoding.encode(value))
-                if key == "name":
+                num_tokens += len(encoding.encode(v))
+                if k == "name":
                     num_tokens += tokens_per_name
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens

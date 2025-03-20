@@ -2,3 +2,8 @@ openai~=1.4.0
 jsonlines~=4.0.0
 tiktoken~=0.7.0
 lmstudio~=1.0.1
+
+# Dev tools
+mypy~=1.15.0
+pylint~=3.3.5a0
+black~=25.1.0

@@ -1,8 +1,10 @@
+# coding=utf-8
 import re
 
 
 class SentenceExtractor:
-    def extract_partial(self, partial_input: str) -> tuple[list[str], str]:
+    @staticmethod
+    def extract_partial(partial_input: str) -> tuple[list[str], str]:
         # Chat GPT doesn't break lines to any particular line width, relying
         # on word wrapping to do the right thing. Therefore, any embedded \n
         # are natural splitting points.

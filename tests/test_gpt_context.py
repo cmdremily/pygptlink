@@ -6,7 +6,7 @@ import tiktoken
 from openai.types.chat.chat_completion import ChatCompletion, Choice
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
-from pygptlink.gpt_context import GPTContext
+from pygptlink.context_history import ContextHistory
 
 
 class TestGPTContext(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestGPTContext(unittest.TestCase):
             persona_file.write("")
 
         # Initialize GPTContext with some sample values
-        self.cut = GPTContext(
+        self.cut = ContextHistory(
             persona_file=self.persona_file,
             context_file=self.context_file,
             model="gpt-3.5-turbo-0613",
@@ -44,7 +44,7 @@ class TestGPTContext(unittest.TestCase):
             os.remove(self.completion_log_file)
 
     def test_empty_context(self):
-        actual = self.cut.oai_messages()
+        actual = self.cut.context_for_oai()
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -52,7 +52,7 @@ class TestGPTContext(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_empty_context_additional_system_prompt(self):
-        actual = self.cut.oai_messages("Other prompt")
+        actual = self.cut.context_for_oai("Other prompt")
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -66,7 +66,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_user_prompt(user="user1", content="test1")
         self.cut.append_user_prompt(user="user2", content="test2")
 
-        cut = GPTContext(
+        cut = ContextHistory(
             persona_file=self.persona_file,
             context_file=self.context_file,
             model="gpt-3.5-turbo-0613",
@@ -74,7 +74,7 @@ class TestGPTContext(unittest.TestCase):
             max_response_tokens=100,
             completion_log_file=self.completion_log_file
         )
-        actual = cut.oai_messages("Extra")
+        actual = cut.context_for_oai("Extra")
 
         expected = [{
             "role": "user",
@@ -111,9 +111,9 @@ class TestGPTContext(unittest.TestCase):
             ]
         )
 
-        self.cut.append_completion(completion)
+        self.cut.append_completion_oai(completion)
 
-        actual = self.cut.oai_messages("Extra")
+        actual = self.cut.context_for_oai("Extra")
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -143,9 +143,9 @@ class TestGPTContext(unittest.TestCase):
             ]
         )
 
-        self.cut.append_completion(completion)
+        self.cut.append_completion_oai(completion)
 
-        actual = self.cut.oai_messages("Extra")
+        actual = self.cut.context_for_oai("Extra")
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -178,9 +178,9 @@ class TestGPTContext(unittest.TestCase):
             ]
         )
 
-        self.cut.append_completion(completion)
+        self.cut.append_completion_oai(completion)
 
-        actual = self.cut.oai_messages("Extra")
+        actual = self.cut.context_for_oai("Extra")
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -202,7 +202,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_user_prompt(
             user="User123", content="User prompt content")
 
-        actual = self.cut.oai_messages()
+        actual = self.cut.context_for_oai()
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -218,7 +218,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_user_prompt(user="user2", content="content2")
         self.cut.append_user_prompt(user="user3", content="content3")
 
-        actual = self.cut.oai_messages()
+        actual = self.cut.context_for_oai()
         expected = [{
             "role": "user",
             "name": "user1",
@@ -242,7 +242,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_user_prompt(user="user2", content="content2")
         self.cut.append_user_prompt(user="user3", content="content3")
 
-        actual = self.cut.oai_messages()
+        actual = self.cut.context_for_oai()
         expected = [{
             "role": "user",
             "name": "user2",
@@ -263,7 +263,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_user_prompt(user="user2", content="content2")
         self.cut.append_user_prompt(user="user3", content="content3")
 
-        actual = self.cut.oai_messages()
+        actual = self.cut.context_for_oai()
         expected = [{
             "role": "user",
             "name": "user2",
@@ -282,7 +282,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_user_prompt(
             user="User123", content="User prompt content")
 
-        actual = self.cut.oai_messages("Other prompt")
+        actual = self.cut.context_for_oai("Other prompt")
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -299,7 +299,7 @@ class TestGPTContext(unittest.TestCase):
     def test_append_tool(self):
         self.cut.append_tool_response("tool_id", "Tool content")
 
-        actual = self.cut.oai_messages("Other prompt")
+        actual = self.cut.context_for_oai("Other prompt")
         expected = [{
             "role": "system",
             "content": "Sample persona content"
@@ -314,7 +314,7 @@ class TestGPTContext(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_dont_split_toolcalls(self):
-        self.cut.append_completion(ChatCompletion(
+        self.cut.append_completion_oai(ChatCompletion(
             **{
                 "id": "chatcmpl-8hnsHMg1kfd96VCz7WRRQSEkehWS6",
                 "choices": [{
@@ -361,7 +361,7 @@ class TestGPTContext(unittest.TestCase):
         self.cut.append_tool_response("call2", "ret2")
         self.cut.append_tool_response("call3", "ret3")
 
-        actual = self.cut.oai_messages("Other prompt")
+        actual = self.cut.context_for_oai("Other prompt")
         expected = [
             {
                 "role": "system",

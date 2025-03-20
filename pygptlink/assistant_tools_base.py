@@ -1,15 +1,17 @@
+# coding=utf-8
 import inspect
 import re
 from enum import Enum, auto
+from typing import Any
 
-from pygptlink.gpt_tool_definition import GPTToolDefinition
-from pygptlink.gpt_logging import logger
+from pygptlink.assistant_tool_definition import AssistantToolDefinition
+from pygptlink.logging import logger
 
 
 def _validate_type(type: str) -> str:
     # Map python types to JSON Schema:
     # https://json-schema.org/understanding-json-schema
-    if re.match("[Ll]ist\[.*?\]", type):
+    if re.match("[Ll]ist\[.*?]", type):
         type = "array"
 
     mapping = {'str': 'string', 'int': 'integer',
@@ -28,16 +30,16 @@ class DocSection(Enum):
     RAISES = auto()
 
 
-class GPTTools:
-    """This is a convenience class that provides an easy way to make python functions callable by LLMs (from GPTCompletion.complete()). It automatically maps Python methods from a subclass of this class to an array of GPTToolDefinitions suitable for use with GPTCompletion.
+class AssistantToolsBase:
+    """This is a convenience class that provides an easy way to make python functions callable by LLMs (from .*Completion.complete()). It automatically maps Python methods from a subclass of this class to an array of ToolDefinitions suitable for use with .*Completion.
 
     To use this class, subclass it and add code and state necessary to implement the methods you wish the model to be able to call, document them with a standard docstring. That's it, when doing a completion, pass the output of `make_tools_list()` to the completion call.
 
     Methods starting with an '_' and methods without docstring are ignored, as are methods with a docstring that contain #NO_GPT_TOOL in the description.
     """
 
-    def make_tools_list(self) -> list[GPTToolDefinition]:
-        ans = []
+    def make_tools_list(self) -> list[AssistantToolDefinition]:
+        ans: list[AssistantToolDefinition] = []
         for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
             doc_string = inspect.getdoc(method)
             if not doc_string:
@@ -49,10 +51,10 @@ class GPTTools:
             previous_blank = False
             current_section = DocSection.SUMMARY
 
-            summary = ""
-            required_args = []
-            optional_args = []
-            current_arg = {}
+            summary: str = ""
+            required_args: list[dict[str, Any]] = []
+            optional_args: list[dict[str, Any]] = []
+            current_arg: dict[str, Any] = {}
 
             ignore_tool = False
 
@@ -77,9 +79,7 @@ class GPTTools:
                             pattern=r"\s*(\w+) \(([^)]+)\): (.+)", string=line)
                         if match:
                             # New argument found
-                            current_arg = {}
-                            current_arg["name"] = match.group(1).strip()
-                            current_arg["description"] = match.group(3).strip()
+                            current_arg = {"name": match.group(1).strip(), "description": match.group(3).strip()}
 
                             opt_match = re.match(
                                 pattern=r"Optional\[(\w+)\].*|(.*?), optional.*", string=match.group(2).strip())
@@ -112,8 +112,8 @@ class GPTTools:
             if ignore_tool:
                 continue
 
-            tool = GPTToolDefinition(name=name, callback=method, description=summary,
-                                     required_args=required_args, optional_args=optional_args)
+            tool = AssistantToolDefinition(name=name, callback=method, description=summary,
+                                           required_args=required_args, optional_args=optional_args)
             logger.debug(f"Parsed tool: {tool.__dict__}")
             ans.append(tool)
         return ans

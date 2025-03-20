@@ -27,12 +27,12 @@ def callback(sentence: str, response_done: bool):
 
 
 async def main():
-    from pygptlink.gpt_context import GPTContext
-    from pygptlink.gpt_completion import GPTCompletion
+    from pygptlink.context_history import ContextHistory
+    from pygptlink.oai_completion import OAICompletion
 
-    completion = GPTCompletion(api_key=API_KEY)
-    context = GPTContext(model="gpt-3.5-turbo",
-                         max_tokens=1000, max_response_tokens=100)
+    completion = OAICompletion(api_key=API_KEY)
+    context = ContextHistory(model="gpt-3.5-turbo",
+                             max_tokens=1000, max_response_tokens=100)
 
     context.append_system_message(
         "You are an unhelpful and sarcastic AI assistant.")
@@ -52,7 +52,7 @@ async def main():
     print(f"Assistant: {response}")
 
     print("\nFull context:")
-    pprint.pprint(context.oai_messages())
+    pprint.pprint(context.context_for_oai())
 
 if __name__ == "__main__":
     asyncio.run(main())
