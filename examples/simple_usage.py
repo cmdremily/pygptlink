@@ -15,7 +15,7 @@ def callback(sentence: str, response_done: bool):
     """Callback function to handle responses from the GPT model.
 
     The library tries to segment the response into full sentences terminated by ASCII period (.)
-    This works reasonably well for English. Might not be called at all if the model performs a 
+    This works reasonably well for English. Might not be called at all if the model performs a
     tool call that doesn't facilitate a response.
 
     Args:
@@ -27,19 +27,16 @@ def callback(sentence: str, response_done: bool):
 
 
 async def main():
-    from pygptlink.gpt_context import GPTContext
-    from pygptlink.gpt_completion import GPTCompletion
+    from pygptlink.context import Context
+    from pygptlink.completion_openai import CompletionOpenAI
 
-    completion = GPTCompletion(api_key=API_KEY)
-    context = GPTContext(model="gpt-3.5-turbo",
-                         max_tokens=1000, max_response_tokens=100)
+    completion = CompletionOpenAI(api_key=API_KEY)
+    context = Context(model="gpt-3.5-turbo", max_tokens=1000, max_response_tokens=100)
 
-    context.append_system_message(
-        "You are an unhelpful and sarcastic AI assistant.")
+    context.append_system_message("You are an unhelpful and sarcastic AI assistant.")
 
     # Using callback to receive sentence-by-sentence response
-    context.append_user_prompt(
-        user="Fluxine", content="Is Finland a real country?")
+    context.append_user_prompt(user="Fluxine", content="Is Finland a real country?")
     print("Fluxine: Is Finland a real country?")
     await completion.complete(context=context, callback=callback)
 
@@ -52,7 +49,8 @@ async def main():
     print(f"Assistant: {response}")
 
     print("\nFull context:")
-    pprint.pprint(context.messages())
+    pprint.pprint(context.messages_openai())
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -11,9 +11,9 @@ setup(
     include_package_data=True,
     package_data={"pytils": ["py.typed"]},
     install_requires=[
-        'openai~=1.4.0',
+        'openai~=1.97.0',
         'jsonlines~=4.0.0',
-        'tiktoken~=0.7.0',
-        'lmstudio~=1.0.1',
+        'tiktoken~=0.9.0',
+        'lmstudio~=1.4.1',
     ],
 )

@@ -10,19 +10,18 @@ class SentenceExtractor:
         trimmed_lines = [line for line in lines if line.strip()]
 
         if len(trimmed_lines) == 0:
-            return [], ''
-        elif partial_input.endswith('\n'):
-            return [line.strip() for line in trimmed_lines], ''
+            return [], ""
+        elif partial_input.endswith("\n"):
+            return [line.strip() for line in trimmed_lines], ""
         else:
             full_lines = trimmed_lines[:-1]
             partial_tail = trimmed_lines[-1]
 
             # Split partial_tail on punctuation marks
-            sentences = re.split(r'(?<=[.;?!])\s+', partial_tail)
+            sentences = re.split(r"(?<=[.;?!])\s+", partial_tail)
 
             # Remove empty strings from sentences list
-            sentences = [
-                sentence for sentence in sentences if sentence.lstrip()]
+            sentences = [sentence for sentence in sentences if sentence.lstrip()]
 
             # Add sentences to full_lines
             full_lines.extend(sentences[0:-1])
