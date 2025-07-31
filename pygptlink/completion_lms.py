@@ -1,13 +1,8 @@
 import asyncio
 from collections.abc import Callable
-
 from pygptlink.context import Context
-from pygptlink.tokens import num_tool_tokens_openai
-from pygptlink.tool_definition import ToolDefinition
 from pygptlink.logging import logger
 from pygptlink.sentenceextractor import SentenceExtractor
-
-
 import lmstudio as lms
 
 
@@ -21,9 +16,6 @@ class CompletionLMS:
         context: Context,
         callback: Callable[[str, bool], None] | None = None,
         extra_system_prompt: str | None = None,
-        tools: list[ToolDefinition] = [],
-        force_tool: bool = False,
-        allowed_tools: list[str] | None = None,
         no_append: bool = False,
     ) -> str:
         """Generates a response to the current context.
@@ -45,46 +37,18 @@ class CompletionLMS:
             Nothing
         """
 
-        tools_map = {tool.name: tool for tool in tools}
-        completion_settings: dict[str, int | float] = {
-            "maxTokens": context.max_response_tokens,
-            "temperature": 0.4,
-            "cpuThreads": 20,
-        }
-
-        if allowed_tools == None:
-            tool_defs = [tool.describe_openai() for tool in tools_map.values()] if tools_map else None
-        elif allowed_tools == []:
-            tool_defs = None
-        else:
-            if not all(tool_name in tools_map for tool_name in allowed_tools):
-                raise ValueError("allowed_tools={allowed_tools} contains unknown tool")
-            tool_defs = [tools_map[tool_name].describe_openai() for tool_name in allowed_tools]
-
-        if force_tool:
-            tool_choice = "required"
-            if not tool_defs:
-                raise ValueError("Tool call forced but no tools allowed or available!")
-        else:
-            tool_choice = "auto" if tools_map else None
-
-        # Prepare arguments for completion
-        # Load model first so the token count will work
         model = lms.llm(
             context.model,
             config={
                 "contextLength": context.max_tokens,
-                "gpuOffload": {"ratio": 1.0, "splitStrategy": "favorMainGpu"},
             },
         )
-        tool_tokens = num_tool_tokens_openai(tools=tool_defs, model=context.model)
-        messages = context.messages_openai(
+        messages = context.messages_lms(
             sticky_system_message=extra_system_prompt,
-            reserved_tokens=tool_tokens,
-            lms=True,
+            reserved_tokens=0,
         )
 
-        def on_fragment(fragment: lms.LlmPredictionFragment, round_index: int = 0):
+        def on_fragment(fragment: lms.LlmPredictionFragment, _round_index: int = 0):
             if callback:
                 callback(fragment.content, False)
 
@@ -95,8 +59,12 @@ class CompletionLMS:
         logger.debug(f"Prompting {model} with: {messages}")
 
         result = model.respond(
-            history={"messages": messages},
-            config=completion_settings,
+            history=messages,
+            config={
+                "maxTokens": context.max_response_tokens,
+                "temperature": 0.4,
+                "cpuThreads": 20,
+            },
             on_prediction_fragment=on_fragment,
             on_message=on_message,
         )

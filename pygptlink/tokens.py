@@ -5,7 +5,7 @@ import lmstudio as lms
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from openai.types.shared_params import FunctionDefinition, FunctionParameters
-from lmstudio import AnyChatMessageDict, ChatHistoryDataDict
+from lmstudio import Chat
 
 # Adapted from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 
@@ -69,13 +69,16 @@ def tool_token_constants(model: str) -> tuple[int, int, int, int, int, int]:
     return func_init, prop_init, prop_key, enum_init, enum_item, func_end
 
 
-def num_tokens_for_messages_lms(messages: Sequence[AnyChatMessageDict], model: str) -> int:
+def lms_model_loaded(model: str) -> bool:
+    """Check if the specified model is loaded in LMS."""
     loaded = {k.get_info().model_key for k in lms.list_loaded_models("llm")}
-    if model not in loaded:
-        raise ValueError(f"Model {model} is not loaded in LMS. Please load the model before counting tokens.")
+    return model in loaded
+
+
+def num_tokens_for_messages_lms(chat: Chat, model: str) -> int:
+    assert lms_model_loaded(model), f"Model {model} must be loaded before counting tokens."
     llm = lms.llm(model)
-    history: ChatHistoryDataDict = {"messages": messages}
-    formatted = llm.apply_prompt_template(history)
+    formatted = llm.apply_prompt_template(chat)
     return len(llm.tokenize(formatted))
 
 
