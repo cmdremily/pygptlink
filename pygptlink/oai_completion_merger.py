@@ -30,6 +30,9 @@ class OpenAICompletionMerger:
                 usage=chunk.usage,
             )
 
+        if self.__completion.usage is None:
+            self.__completion.usage = chunk.usage
+
         for chunk_choice in chunk.choices:
             assert (
                 not chunk_choice.delta.role or chunk_choice.delta.role == "assistant"
@@ -67,18 +70,11 @@ class OpenAICompletionMerger:
                             type="function",
                         )
                     )
-                result_tool_call = result_choice.message.tool_calls[
-                    delta_toolcall.index
-                ]
-                result_tool_call.id = (
-                    self.__append_or_not(result_tool_call.id, delta_toolcall.id) or ""
-                )
+                result_tool_call = result_choice.message.tool_calls[delta_toolcall.index]
+                result_tool_call.id = self.__append_or_not(result_tool_call.id, delta_toolcall.id) or ""
                 if delta_toolcall.function:
                     result_tool_call.function.name = (
-                        self.__append_or_not(
-                            result_tool_call.function.name, delta_toolcall.function.name
-                        )
-                        or ""
+                        self.__append_or_not(result_tool_call.function.name, delta_toolcall.function.name) or ""
                     )
                     result_tool_call.function.arguments = (
                         self.__append_or_not(

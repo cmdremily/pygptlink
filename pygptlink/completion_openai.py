@@ -65,11 +65,14 @@ class CompletionOpenAI:
                 raise ValueError("Tool call forced but no tools allowed or available!")
 
         messages = context.messages_openai(sticky_system_message=extra_system_prompt, reserved_tokens=tool_tokens)
+
         logger.debug(f"Prompting with: {messages}")
         stream = await self.__client.chat.completions.create(
             model=context.model,
+            temperature=context.temperature,
             max_tokens=context.max_response_tokens,
             stream=True,
+            stream_options={"include_usage": True},
             messages=messages,
             tools=tool_defs,
             tool_choice=tool_choice,
@@ -80,6 +83,8 @@ class CompletionOpenAI:
         chunk_merger = OpenAICompletionMerger()
         async for chunk in stream:
             chunk_merger.append(chunk)
+            if not chunk.choices or not chunk.choices[0].delta:
+                continue
             partial_sentence += chunk.choices[0].delta.content or ""
             lines, partial_sentence = self.__sentence_extractor.extract_partial(partial_sentence)
             for line in lines:
@@ -92,6 +97,13 @@ class CompletionOpenAI:
         # Look for any function calls in the finished completion.
         chat_completion = chunk_merger.result()
         logger.debug(f"Received object: {chat_completion}")
+        usage = chat_completion.usage
+        if usage is None:
+            logger.warning("No usage information in the completion response, assuming 0 tokens used.")
+        else:
+            logger.debug(f"Prompt tokens: {usage.prompt_tokens}")
+            logger.debug(f"Completion tokens: {usage.completion_tokens}")
+            logger.debug(f"Total tokens: {usage.total_tokens}")
         if not no_append:
             context.append_completion_openai(chat_completion)
         should_respond_to_tool = False

@@ -81,6 +81,7 @@ class Context:
         persona_file: str | Path | None = None,
         context_file: str | Path | None = None,
         completion_log_file: str | Path | None = None,
+        temperature: float = 0.4,
     ) -> None:
         """Creates a new GPTContext.
 
@@ -99,6 +100,7 @@ class Context:
         self._completion_log_file = completion_log_file or None
         self._max_tokens = max_tokens
         self._max_response_tokens = max_response_tokens
+        self._temperature = temperature
 
         self._context: list[MessageType] = []
         self._context_file = context_file or None
@@ -122,6 +124,10 @@ class Context:
                 logger.warning(f"The context file does not exist: {self._context_file}")
             except OSError as e:
                 logger.error(f"An error occurred while opening the file: {e}")
+
+    @property
+    def temperature(self) -> float:
+        return self._temperature
 
     @property
     def model(self) -> str:
@@ -424,11 +430,25 @@ class Context:
     @staticmethod
     def __msg_to_openai(message: MessageType) -> Generator[ChatCompletionMessageParam, None, None]:
         if message["role"] == "assistant":
-            yield {
-                "role": "assistant",
-                "content": message.get("content", None),
-                "tool_calls": message.get("tool_calls", ()),
-            }
+            assert (
+                "tool_calls" in message or "content" in message
+            ), "Assistant message must have either tool_calls or content."
+            if "tool_calls" in message and "content" in message:
+                yield {
+                    "role": "assistant",
+                    "content": message["content"],
+                    "tool_calls": message["tool_calls"],
+                }
+            elif "tool_calls" in message:
+                yield {
+                    "role": "assistant",
+                    "tool_calls": message["tool_calls"],
+                }
+            elif "content" in message:
+                yield {
+                    "role": "assistant",
+                    "content": message["content"],
+                }
         elif message["role"] == "user":
             yield {
                 "role": "user",

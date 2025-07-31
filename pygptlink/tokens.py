@@ -11,29 +11,9 @@ from lmstudio import Chat
 
 
 def message_token_constants(model: str) -> tuple[int, int]:
-    if model in {
-        "gpt-3.5-turbo-0125",
-        "gpt-4-0314",
-        "gpt-4-32k-0314",
-        "gpt-4-0613",
-        "gpt-4-32k-0613",
-        "gpt-4o-mini-2024-07-18",
-        "gpt-4o-2024-08-06",
-    }:
-        tokens_per_message = 3
-        tokens_per_name = 1
-    elif "gpt-3.5-turbo" in model:
-        return message_token_constants(model="gpt-3.5-turbo-0125")
-    elif "gpt-4o-mini" in model:
-        return message_token_constants(model="gpt-4o-mini-2024-07-18")
-    elif "gpt-4o" in model:
-        return message_token_constants(model="gpt-4o-2024-08-06")
-    elif "gpt-4" in model:
-        return message_token_constants(model="gpt-4-0613")
-    else:
-        # Print error and assume the values are unchanged. Don't stop production just to make an uneducated guess.
-        logger.error(f"message_token_constants() is not implemented for model {model}, assuming same as gpt-4o.")
-        return message_token_constants("gpt-4o")
+    # For now, all relevant models have the same token constants.
+    tokens_per_message = 3
+    tokens_per_name = 1
     return tokens_per_message, tokens_per_name
 
 
@@ -65,7 +45,7 @@ def tool_token_constants(model: str) -> tuple[int, int, int, int, int, int]:
     else:
         # We pick the model with the most tokens as the fallback.
         logger.error(f"tool_token_constants() is not implemented for model {model}. Assuming gpt-4 token counts.")
-        return tool_token_constants(model="gpt-4")
+        return tool_token_constants(model="gpt-4o")
     return func_init, prop_init, prop_key, enum_init, enum_item, func_end
 
 
@@ -82,14 +62,21 @@ def num_tokens_for_messages_lms(chat: Chat, model: str) -> int:
     return len(llm.tokenize(formatted))
 
 
+def _get_openai_model(model: str) -> str:
+    # Tiktoken hasn't updated for gpt-4.1 yet, so we need to map it to gpt-4o.
+    if "gpt-4.1" in model:
+        return "gpt-4o"
+    return model
+
+
 def num_messages_tokens_openai(messages: Sequence[ChatCompletionMessageParam], model: str) -> int:
     try:
-        encoding = tiktoken.encoding_for_model(model)
+        encoding = tiktoken.encoding_for_model(_get_openai_model(model))
     except KeyError:
         print("Warning: model not found. Using o200k_base encoding.")
         encoding = tiktoken.get_encoding("o200k_base")
 
-    tokens_per_message, tokens_per_name = message_token_constants(model)
+    tokens_per_message, tokens_per_name = message_token_constants(_get_openai_model(model))
 
     num_tokens = 0
     for message in messages:
@@ -106,6 +93,8 @@ def num_messages_tokens_openai(messages: Sequence[ChatCompletionMessageParam], m
         for key, value in message.items():
             if key == "tool_calls":
                 continue
+            if not value:
+                continue
             if not isinstance(value, str):
                 raise ValueError(
                     f"Expected string value for key '{key}' in message, got {type(value).__name__} instead."
@@ -118,8 +107,8 @@ def num_messages_tokens_openai(messages: Sequence[ChatCompletionMessageParam], m
 
 
 def num_tool_tokens_openai(tools: list[ChatCompletionToolParam], model: str) -> int:
-    func_init, prop_init, prop_key, enum_init, enum_item, func_end = tool_token_constants(model)
-    enc = tiktoken.encoding_for_model(model)
+    func_init, prop_init, prop_key, enum_init, enum_item, func_end = tool_token_constants(_get_openai_model(model))
+    enc = tiktoken.encoding_for_model(_get_openai_model(model))
 
     ans = 0
     if len(tools or []) > 0:
