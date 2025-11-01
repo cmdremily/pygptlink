@@ -2,7 +2,6 @@ from collections.abc import Callable
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionToolParam
 from pygptlink.context import Context
-from pygptlink.no_response_desired import NoResponseDesired
 from pygptlink.tokens import num_tool_tokens_openai
 from pygptlink.tool_definition import ToolDefinition
 from pygptlink.logging import logger
@@ -66,11 +65,12 @@ class CompletionOpenAI:
 
         messages = context.messages_openai(sticky_system_message=extra_system_prompt, reserved_tokens=tool_tokens)
 
+        logger.debug(f"Tool definitions: {tool_defs}")
         logger.debug(f"Prompting with: {messages}")
         stream = await self.__client.chat.completions.create(
             model=context.model,
             temperature=context.temperature,
-            max_tokens=context.max_response_tokens,
+            max_completion_tokens=context.max_response_tokens,
             stream=True,
             stream_options={"include_usage": True},
             messages=messages,
@@ -112,26 +112,25 @@ class CompletionOpenAI:
                 tool = tools_map.get(tool_call.function.name, None)
                 if tool is None:
                     logger.warning(f"Invalid tool invocation, tool: {tool_call.function.name} doesn't exist.")
-                    response = f"Error: No such tool: {tool_call.function.name}."
                     if not no_append:
-                        context.append_tool_response(tool_call.id, response)
+                        context.append_tool_response(tool_call.id, f"Error: No such tool: {tool_call.function.name}.")
                     # Let the LLM know so it can try to fix
                     should_respond_to_tool = True
                 else:
                     logger.info(f"Tool invocation: {tool_call.function}")
-                    response = await tool.invoke(tool_call)
-                    if isinstance(response, NoResponseDesired):
-                        response = ""
-                    else:
-                        should_respond_to_tool = True
-                    context.append_tool_response(tool_call.id, response)
+                    tool_response, should_respond_to_tool = await tool.invoke(tool_call)
+                    logger.debug(f"Tool response ({should_respond_to_tool}): {tool_response}")
+                    if not no_append:
+                        context.append_tool_response(tool_call.id, tool_response)
             logger.info(f" -- LLM Response Ended ({choice.finish_reason}) -- ")
 
         response = None
         if chat_completion.choices[0].message:
             response = chat_completion.choices[0].message.content
 
-        if should_respond_to_tool:
+        if should_respond_to_tool and not no_append:
+            # Since we're not appending to the context, ,we cannot do recursive tool calls since
+            # there isn't enough context for the LLM to understand what to do.
             sub_response = await self.complete(
                 context=context,
                 extra_system_prompt=extra_system_prompt,

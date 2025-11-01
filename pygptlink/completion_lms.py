@@ -11,6 +11,10 @@ class CompletionLMS:
         self.lock = asyncio.Lock()
         self.sentence_extractor = SentenceExtractor()
 
+    def list_models(self) -> list[str]:
+        """Lists available models."""
+        return [m.model_key for m in lms.list_downloaded_models("llm")]
+
     def complete(
         self,
         context: Context,
@@ -39,9 +43,7 @@ class CompletionLMS:
 
         model = lms.llm(
             context.model,
-            config={
-                "contextLength": context.max_tokens,
-            },
+            config={"contextLength": context.max_tokens, "gpu": {"ratio": 0.6}},
         )
         messages = context.messages_lms(
             sticky_system_message=extra_system_prompt,

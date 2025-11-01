@@ -4,7 +4,6 @@ from typing import Any, Callable, Literal, NotRequired, TypedDict
 
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
-from pygptlink.logging import logger
 from pygptlink.no_response_desired import NoResponseDesired
 
 
@@ -44,7 +43,7 @@ class ToolDefinition:
         self.required_args = required_args or []
         self.optional_args = optional_args or []
 
-    async def invoke(self, tool_call: ChatCompletionMessageToolCall) -> str | NoResponseDesired:
+    async def invoke(self, tool_call: ChatCompletionMessageToolCall) -> tuple[str, bool]:
         assert self.name == tool_call.function.name
 
         try:
@@ -59,29 +58,30 @@ class ToolDefinition:
             else:
                 ans = result
 
-            if ans is None:
-                rv = "The tool call completed successfully."
+            if not ans:
+                return ("Success.", True)
             elif isinstance(ans, NoResponseDesired):
-                return ans
+                return ("Success. Do not respond to this tool call.", False)
             else:
-                rv = f"The tool call returned: {ans}"
+                return (ans, True)
         except Exception as e:
-            rv = f"The tool call threw an exception: {e}"
-
-        logger.debug(f"Tool invocation completed with: {rv}")
-        return rv
+            return (f"An exception ocurred: {e}", True)
 
     def describe_openai(self) -> ChatCompletionToolParam:
-        desc: ChatCompletionToolParam = {
+        # OpenAI API requires the "additionalProperties" field to be False when
+        # strict is True, meaning that the "Parameters" object must be present.
+        all_args = self.required_args + self.optional_args
+        return {
             "type": "function",
-            "function": {"name": self.name, "description": self.description, "strict": True},
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "strict": True,
+                "parameters": {
+                    "type": "object",
+                    "properties": {t["name"]: {"type": t["type"], "description": t["description"]} for t in all_args},
+                    "required": [t["name"] for t in (self.required_args or [])],
+                    "additionalProperties": False,
+                },
+            },
         }
-        if self.required_args or self.optional_args:
-            all_args = self.required_args + self.optional_args
-            desc["function"]["parameters"] = {
-                "type": "object",
-                "properties": {t["name"]: {"type": t["type"], "description": t["description"]} for t in all_args},
-                "required": [t["name"] for t in (self.required_args or [])],
-                "additionalProperties": False,
-            }
-        return desc

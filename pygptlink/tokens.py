@@ -66,6 +66,8 @@ def _get_openai_model(model: str) -> str:
     # Tiktoken hasn't updated for gpt-4.1 yet, so we need to map it to gpt-4o.
     if "gpt-4.1" in model:
         return "gpt-4o"
+    if "gpt-5" in model:
+        return "gpt-4o"
     return model
 
 

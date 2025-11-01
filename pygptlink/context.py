@@ -81,7 +81,7 @@ class Context:
         persona_file: str | Path | None = None,
         context_file: str | Path | None = None,
         completion_log_file: str | Path | None = None,
-        temperature: float = 0.4,
+        temperature: float = 1.0,
     ) -> None:
         """Creates a new GPTContext.
 
