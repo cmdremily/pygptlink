@@ -269,6 +269,18 @@ class Context:
             list[dict]: A "messages" structure, a list of "message" dicts.
         """
         chat = Chat()
+
+        assert lms_model_loaded(self._model), f"Model {self._model} must be loaded before converting context."
+        model = lmstudio.llm(self._model)
+        assert model is not None, f"Model {self._model} not found in LMStudio!"
+        if self._persona_file:
+            with open(self._persona_file, "r") as file:
+                persona = file.read()
+        else:
+            persona = ""
+        merged_system = (persona + "\n\n" + (sticky_system_message or "")).strip()
+
+        chat.add_system_prompt(merged_system)
         for msg in self._combine_messages(self._context):
             if msg["role"] == "assistant":
                 tool_calls: list[ToolCallRequest] = []
@@ -289,36 +301,6 @@ class Context:
                 chat.add_system_prompt(msg["content"])
             elif msg["role"] == "tool":
                 chat.add_tool_result(ToolCallResultData(content=msg["content"], tool_call_id=msg["tool_call_id"]))
-
-        assert lms_model_loaded(self._model), f"Model {self._model} must be loaded before converting context."
-        model = lmstudio.llm(self._model)
-        assert model is not None, f"Model {self._model} not found in LMStudio!"
-        if self._persona_file:
-            with open(self._persona_file, "r") as file:
-                persona = file.read()
-        else:
-            persona = ""
-        merged_system = ((persona or "") + "\n\n" + (sticky_system_message or "")).strip()
-        merged_system_tokens = 0
-        if merged_system:
-            merged_system_tokens = len(model.tokenize(merged_system))
-        available_tokens = (
-            min(model.get_context_length(), self._max_tokens)
-            - self._max_response_tokens
-            - reserved_tokens
-            - merged_system_tokens
-        )
-
-        # Don't look now... It's gross...
-        while len(chat._messages) and (  # pyright: ignore[reportPrivateUsage]
-            chat._messages[0].role == "tool"  # pyright: ignore[reportPrivateUsage]
-            or num_tokens_for_messages_lms(chat, self._model) > available_tokens
-        ):
-            if len(self._context) > 0:
-                self._context.pop(0)
-            chat._messages.pop(0)  # pyright: ignore[reportPrivateUsage]
-        chat.add_system_prompt(merged_system)
-        chat._messages.insert(0, chat._messages.pop())  # pyright: ignore[reportPrivateUsage]
         return chat
 
     def _splice_sticky_messages(self, sticky_system_message: str | None = None) -> list[MessageType]:

@@ -43,7 +43,7 @@ class CompletionLMS:
 
         model = lms.llm(
             context.model,
-            config={"contextLength": context.max_tokens, "gpu": {"ratio": 0.6}},
+            config={"contextLength": context.max_tokens},
         )
         messages = context.messages_lms(
             sticky_system_message=extra_system_prompt,
@@ -64,8 +64,8 @@ class CompletionLMS:
             history=messages,
             config={
                 "maxTokens": context.max_response_tokens,
-                "temperature": 0.4,
-                "cpuThreads": 20,
+                "temperature": context.temperature,
+                "contextOverflowPolicy": "truncateMiddle",
             },
             on_prediction_fragment=on_fragment,
             on_message=on_message,

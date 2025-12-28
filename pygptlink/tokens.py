@@ -117,7 +117,7 @@ def num_tool_tokens_openai(tools: list[ChatCompletionToolParam], model: str) -> 
         for tool in tools:
             f: FunctionDefinition = tool["function"]
             ans += func_init
-            ans += len(enc.encode(f"{f["name"]}:{f.get("description", "").removesuffix(".")}"))
+            ans += len(enc.encode(f"{f['name']}:{f.get('description', '').removesuffix('.')}"))
             f_param: FunctionParameters = f.get("parameters", {})
             f_properties: dict[str, Any] = f_param.get("properties", {})  # type: ignore
             if len(f_properties) > 0:
