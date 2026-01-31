@@ -1,4 +1,0 @@
-openai~=1.97.0
-jsonlines~=4.0.0
-tiktoken~=0.9.0
-lmstudio~=1.4.1

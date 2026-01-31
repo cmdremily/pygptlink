@@ -1,6 +1,7 @@
 .venv
 __pycache__
-PyGPTLink.egg-info
+*egg-info
+
 build/
 .idea/
 test_*

@@ -20,7 +20,6 @@ from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from pygptlink.logging import logger
 from pygptlink.tokens import (
     lms_model_loaded,
-    num_tokens_for_messages_lms,
     num_messages_tokens_openai,
 )
 
@@ -397,7 +396,7 @@ class Context:
             return None
 
     def __append_message(self, message: MessageType) -> None:
-        if not "tool_calls" in message and not message.get("content"):
+        if "tool_calls" not in message and not message.get("content"):
             raise ValueError(f"Empty content in context for message: {message}!")
         message["msg_id"] = str(uuid4())
         message["msg_timestamp"] = datetime.now(tz=timezone.utc).isoformat()
