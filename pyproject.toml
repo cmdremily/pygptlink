@@ -1,7 +1,7 @@
 [project]
 name = "PyGPTLink"
-version = "0.1.0"
-requires-python = ">=3.13"
+version = "1.1.0"
+requires-python = ">=3.11"
 dependencies = [
     "jsonlines~=4.0.0",
     "lmstudio~=1.4.1",
@@ -13,11 +13,17 @@ dependencies = [
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mypkg = ["py.typed"]
+
 [tool.mypy]
 strict = true
-
-[tool.black]
-line-length = 120
 
 [dependency-groups]
 dev = [
