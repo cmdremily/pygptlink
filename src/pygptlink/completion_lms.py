@@ -7,9 +7,9 @@ import lmstudio as lms
 
 
 class CompletionLMS:
-    def __init__(self):
-        self.lock = asyncio.Lock()
-        self.sentence_extractor = SentenceExtractor()
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._sentence_extractor = SentenceExtractor()
 
     def list_models(self) -> list[str]:
         """Lists available models."""
@@ -50,11 +50,13 @@ class CompletionLMS:
             reserved_tokens=0,
         )
 
-        def on_fragment(fragment: lms.LlmPredictionFragment, _round_index: int = 0):
+        def on_fragment(
+            fragment: lms.LlmPredictionFragment, _round_index: int = 0
+        ) -> None:
             if callback:
                 callback(fragment.content, False)
 
-        def on_message(msg: lms.AssistantResponse | lms.ToolResultMessage):
+        def on_message(msg: lms.AssistantResponse | lms.ToolResultMessage) -> None:
             if not no_append:
                 context.append_completion_lms(msg)
 

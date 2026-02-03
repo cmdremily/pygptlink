@@ -1,6 +1,10 @@
 from collections.abc import Callable
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionToolParam
+from openai.types.chat import (
+    ChatCompletionStreamOptionsParam,
+    ChatCompletionToolChoiceOptionParam,
+    ChatCompletionToolParam,
+)
 from pygptlink.context import Context
 from pygptlink.tokens import num_tool_tokens_openai
 from pygptlink.tool_definition import ToolDefinition
@@ -50,20 +54,28 @@ class CompletionOpenAI:
                 raise ValueError(
                     f"Allowed_tools={allowed_tools} contains unknown tool. Known tools: {list(tools_map.keys())}"
                 )
-            tool_defs = [tools_map[tool_name].describe_openai() for tool_name in allowed_tools]
+            tool_defs = [
+                tools_map[tool_name].describe_openai() for tool_name in allowed_tools
+            ]
         elif allowed_tools is None:
             tool_defs = [tool.describe_openai() for tool in tools_map.values()]
 
-        if tool_defs:
-            tool_tokens = num_tool_tokens_openai(tools=tool_defs, model=context.model)
-            tool_choice = "required" if force_tool else "auto"
-        else:
-            tool_tokens = 0
-            tool_choice = "none"
-            if force_tool:
-                raise ValueError("Tool call forced but no tools allowed or available!")
+        tool_tokens = (
+            num_tool_tokens_openai(tools=tool_defs, model=context.model)
+            if tool_defs
+            else 0
+        )
+        tool_choice: ChatCompletionToolChoiceOptionParam = (
+            "none" if not tool_defs else ("required" if force_tool else "auto")
+        )
+        if not tool_defs and force_tool:
+            raise ValueError("Tool call forced but no tools allowed or available!")
 
-        messages = context.messages_openai(sticky_system_message=extra_system_prompt, reserved_tokens=tool_tokens)
+        messages = context.messages_openai(
+            sticky_system_message=extra_system_prompt, reserved_tokens=tool_tokens
+        )
+
+        stream_options: ChatCompletionStreamOptionsParam = {"include_usage": True}
 
         logger.debug(f"Tool definitions: {tool_defs}")
         logger.debug(f"Prompting with: {messages}")
@@ -72,7 +84,7 @@ class CompletionOpenAI:
             temperature=context.temperature,
             max_completion_tokens=context.max_response_tokens,
             stream=True,
-            stream_options={"include_usage": True},
+            stream_options=stream_options,
             messages=messages,
             tools=tool_defs,
             tool_choice=tool_choice,
@@ -86,7 +98,9 @@ class CompletionOpenAI:
             if not chunk.choices or not chunk.choices[0].delta:
                 continue
             partial_sentence += chunk.choices[0].delta.content or ""
-            lines, partial_sentence = self.__sentence_extractor.extract_partial(partial_sentence)
+            lines, partial_sentence = self.__sentence_extractor.extract_partial(
+                partial_sentence
+            )
             for line in lines:
                 if callback:
                     callback(line, False)
@@ -99,7 +113,9 @@ class CompletionOpenAI:
         logger.debug(f"Received object: {chat_completion}")
         usage = chat_completion.usage
         if usage is None:
-            logger.warning("No usage information in the completion response, assuming 0 tokens used.")
+            logger.warning(
+                "No usage information in the completion response, assuming 0 tokens used."
+            )
         else:
             logger.debug(f"Prompt tokens: {usage.prompt_tokens}")
             logger.debug(f"Completion tokens: {usage.completion_tokens}")
@@ -111,15 +127,22 @@ class CompletionOpenAI:
             for tool_call in choice.message.tool_calls or []:
                 tool = tools_map.get(tool_call.function.name, None)
                 if tool is None:
-                    logger.warning(f"Invalid tool invocation, tool: {tool_call.function.name} doesn't exist.")
+                    logger.warning(
+                        f"Invalid tool invocation, tool: {tool_call.function.name} doesn't exist."
+                    )
                     if not no_append:
-                        context.append_tool_response(tool_call.id, f"Error: No such tool: {tool_call.function.name}.")
+                        context.append_tool_response(
+                            tool_call.id,
+                            f"Error: No such tool: {tool_call.function.name}.",
+                        )
                     # Let the LLM know so it can try to fix
                     should_respond_to_tool = True
                 else:
                     logger.info(f"Tool invocation: {tool_call.function}")
                     tool_response, should_respond_to_tool = await tool.invoke(tool_call)
-                    logger.debug(f"Tool response ({should_respond_to_tool}): {tool_response}")
+                    logger.debug(
+                        f"Tool response ({should_respond_to_tool}): {tool_response}"
+                    )
                     if not no_append:
                         context.append_tool_response(tool_call.id, tool_response)
             logger.info(f" -- LLM Response Ended ({choice.finish_reason}) -- ")

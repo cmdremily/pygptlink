@@ -44,7 +44,9 @@ def tool_token_constants(model: str) -> tuple[int, int, int, int, int, int]:
         func_end = 12
     else:
         # We pick the model with the most tokens as the fallback.
-        logger.error(f"tool_token_constants() is not implemented for model {model}. Assuming gpt-4 token counts.")
+        logger.error(
+            f"tool_token_constants() is not implemented for model {model}. Assuming gpt-4 token counts."
+        )
         return tool_token_constants(model="gpt-4o")
     return func_init, prop_init, prop_key, enum_init, enum_item, func_end
 
@@ -56,7 +58,9 @@ def lms_model_loaded(model: str) -> bool:
 
 
 def num_tokens_for_messages_lms(chat: Chat, model: str) -> int:
-    assert lms_model_loaded(model), f"Model {model} must be loaded before counting tokens."
+    assert lms_model_loaded(model), (
+        f"Model {model} must be loaded before counting tokens."
+    )
     llm = lms.llm(model)
     formatted = llm.apply_prompt_template(chat)
     return len(llm.tokenize(formatted))
@@ -71,21 +75,25 @@ def _get_openai_model(model: str) -> str:
     return model
 
 
-def num_messages_tokens_openai(messages: Sequence[ChatCompletionMessageParam], model: str) -> int:
+def num_messages_tokens_openai(
+    messages: Sequence[ChatCompletionMessageParam], model: str
+) -> int:
     try:
         encoding = tiktoken.encoding_for_model(_get_openai_model(model))
     except KeyError:
         print("Warning: model not found. Using o200k_base encoding.")
         encoding = tiktoken.get_encoding("o200k_base")
 
-    tokens_per_message, tokens_per_name = message_token_constants(_get_openai_model(model))
+    tokens_per_message, tokens_per_name = message_token_constants(
+        _get_openai_model(model)
+    )
 
     num_tokens = 0
     for message in messages:
         num_tokens += tokens_per_message
 
-        if "tool_calls" in message:
-            for tool_call in message.get("tool_calls", []):
+        if "assistant" == message["role"] and "tool_calls" in message:
+            for tool_call in message["tool_calls"]:
                 num_tokens += 3  # Stab in the dark guess at token count for tool calls.
                 num_tokens += len(encoding.encode(tool_call["id"]))
                 num_tokens += len(encoding.encode(tool_call["type"]))
@@ -109,7 +117,9 @@ def num_messages_tokens_openai(messages: Sequence[ChatCompletionMessageParam], m
 
 
 def num_tool_tokens_openai(tools: list[ChatCompletionToolParam], model: str) -> int:
-    func_init, prop_init, prop_key, enum_init, enum_item, func_end = tool_token_constants(_get_openai_model(model))
+    func_init, prop_init, prop_key, enum_init, enum_item, func_end = (
+        tool_token_constants(_get_openai_model(model))
+    )
     enc = tiktoken.encoding_for_model(_get_openai_model(model))
 
     ans = 0
@@ -117,7 +127,9 @@ def num_tool_tokens_openai(tools: list[ChatCompletionToolParam], model: str) -> 
         for tool in tools:
             f: FunctionDefinition = tool["function"]
             ans += func_init
-            ans += len(enc.encode(f"{f['name']}:{f.get('description', '').removesuffix('.')}"))
+            ans += len(
+                enc.encode(f"{f['name']}:{f.get('description', '').removesuffix('.')}")
+            )
             f_param: FunctionParameters = f.get("parameters", {})
             f_properties: dict[str, Any] = f_param.get("properties", {})  # type: ignore
             if len(f_properties) > 0:

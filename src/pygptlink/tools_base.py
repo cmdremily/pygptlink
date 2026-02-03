@@ -72,7 +72,9 @@ class ToolsBase:
                         else:
                             summary = line.strip()
                     elif current_section == DocSection.ARGS:
-                        match = re.match(pattern=r"\s*(\w+) \(([^)]+)\): (.+)", string=line)
+                        match = re.match(
+                            pattern=r"\s*(\w+) \(([^)]+)\): (.+)", string=line
+                        )
                         if match:
                             # New argument found
                             arg_name = match.group(1).strip()
@@ -83,7 +85,9 @@ class ToolsBase:
                                 string=match.group(2).strip(),
                             )
                             if opt_match:
-                                arg_type = _validate_type(opt_match.group(1) or opt_match.group(2))
+                                arg_type = _validate_type(
+                                    opt_match.group(1) or opt_match.group(2)
+                                )
                                 current_arg = ArgSpec(
                                     name=arg_name,
                                     type=arg_type,

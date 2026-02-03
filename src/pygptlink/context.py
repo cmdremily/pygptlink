@@ -112,7 +112,9 @@ class Context:
                 max_chars_to_read = max_tokens * 8
 
                 with open(self._context_file, "r", encoding="utf-8") as file:
-                    start_offs = max(0, os.path.getsize(self._context_file) - max_chars_to_read)
+                    start_offs = max(
+                        0, os.path.getsize(self._context_file) - max_chars_to_read
+                    )
                     file.seek(start_offs)
                     if start_offs != 0:
                         file.readline()  # Discard until next endline.
@@ -154,7 +156,7 @@ class Context:
         new_ctx._context = self._context.copy()
         return new_ctx
 
-    def append_completion_lms(self, msg: AssistantResponse | ToolResultMessage):
+    def append_completion_lms(self, msg: AssistantResponse | ToolResultMessage) -> None:
         if self._completion_log_file:
             with open(self._completion_log_file, "a", encoding="utf-8") as file:
                 file.write(msg.__str__() + "\n")
@@ -162,14 +164,16 @@ class Context:
         if isinstance(msg, ToolResultMessage):
             # This is a bit special, to maintain compatibility we need to split these into multiple
             # messages.
-            for content in msg.content:
-                assert content.type == "toolCallResult"
-                assert content.tool_call_id is not None, "Tool call ID is missing!"
+            for tool_call_result in msg.content:
+                assert tool_call_result.type == "toolCallResult"
+                assert tool_call_result.tool_call_id is not None, (
+                    "Tool call ID is missing!"
+                )
                 self.__append_message(
                     MessageToolReturn(
                         role="tool",
-                        tool_call_id=content.tool_call_id,
-                        content=content.content,
+                        tool_call_id=tool_call_result.tool_call_id,
+                        content=tool_call_result.content,
                     )
                 )
             return
@@ -178,12 +182,16 @@ class Context:
             role="assistant",
             tool_calls=[],
         )
-        assert "tool_calls" in tool_call_accumulator, "Tool calls accumulator is missing!"
+        assert "tool_calls" in tool_call_accumulator, (
+            "Tool calls accumulator is missing!"
+        )
         for content in msg.content:
             if content.type == "text":
                 self.append_assistant_prompt(content.text)
             elif content.type == "toolCallRequest":
-                assert content.tool_call_request.id is not None, "Tool call ID is missing!"
+                assert content.tool_call_request.id is not None, (
+                    "Tool call ID is missing!"
+                )
                 tool_call_accumulator["tool_calls"].append(
                     ToolCall(
                         id=content.tool_call_request.id,
@@ -197,7 +205,9 @@ class Context:
         if tool_call_accumulator["tool_calls"]:
             self.__append_message(tool_call_accumulator)
 
-    def append_completion_openai(self, completion: ChatCompletion, choice: int = 0) -> None:
+    def append_completion_openai(
+        self, completion: ChatCompletion, choice: int = 0
+    ) -> None:
         """Parses a provided ChatCompletion object and appends suitable entries to the context to represent that this completion is part of the context history.
 
         Args:
@@ -233,7 +243,9 @@ class Context:
                         },
                     }
                 )
-            self.__append_message(message={"role": completion_message.role, "tool_calls": tool_calls})
+            self.__append_message(
+                message={"role": completion_message.role, "tool_calls": tool_calls}
+            )
 
     def append_assistant_prompt(self, content: str) -> None:
         message: MessageAssistant = {"role": "assistant", "content": content}
@@ -256,7 +268,9 @@ class Context:
     def append_system_message(self, content: str) -> None:
         self.__append_message(self.__system_message(content))
 
-    def messages_lms(self, sticky_system_message: str | None = None, reserved_tokens: int = 0) -> Chat:
+    def messages_lms(
+        self, sticky_system_message: str | None = None, reserved_tokens: int = 0
+    ) -> Chat:
         """Generates a list of dicts that can be passed to OpenAIs completion API.
 
         There is usually no need to call this directly.
@@ -269,7 +283,9 @@ class Context:
         """
         chat = Chat()
 
-        assert lms_model_loaded(self._model), f"Model {self._model} must be loaded before converting context."
+        assert lms_model_loaded(self._model), (
+            f"Model {self._model} must be loaded before converting context."
+        )
         model = lmstudio.llm(self._model)
         assert model is not None, f"Model {self._model} not found in LMStudio!"
         if self._persona_file:
@@ -290,19 +306,29 @@ class Context:
                                 type="function",
                                 id=tool_call["id"],
                                 name=tool_call["function"]["name"],
-                                arguments=json.loads(tool_call["function"]["arguments"]),
+                                arguments=json.loads(
+                                    tool_call["function"]["arguments"]
+                                ),
                             )
                         )
-                chat.add_assistant_response(response=msg.get("content", ""), tool_call_requests=tool_calls)
+                chat.add_assistant_response(
+                    response=msg.get("content", ""), tool_call_requests=tool_calls
+                )
             elif msg["role"] == "user":
                 chat.add_user_message(msg["content"])
             elif msg["role"] == "system":
                 chat.add_system_prompt(msg["content"])
             elif msg["role"] == "tool":
-                chat.add_tool_result(ToolCallResultData(content=msg["content"], tool_call_id=msg["tool_call_id"]))
+                chat.add_tool_result(
+                    ToolCallResultData(
+                        content=msg["content"], tool_call_id=msg["tool_call_id"]
+                    )
+                )
         return chat
 
-    def _splice_sticky_messages(self, sticky_system_message: str | None = None) -> list[MessageType]:
+    def _splice_sticky_messages(
+        self, sticky_system_message: str | None = None
+    ) -> list[MessageType]:
         if self._persona_file:
             with open(self._persona_file, "r") as file:
                 persona = file.read()
@@ -330,7 +356,9 @@ class Context:
         messages += right_split
         return messages
 
-    def _combine_messages(self, messages: list[MessageType]) -> Generator[MessageType, None, None]:
+    def _combine_messages(
+        self, messages: list[MessageType]
+    ) -> Generator[MessageType, None, None]:
         prev_msg: MessageType | None = None
         for msg in messages:
             if not prev_msg:
@@ -364,10 +392,13 @@ class Context:
             for y in self.__msg_to_openai(x):
                 openai_messages.append(y)
 
-        available_tokens = self._max_tokens - self._max_response_tokens - reserved_tokens
+        available_tokens = (
+            self._max_tokens - self._max_response_tokens - reserved_tokens
+        )
         while len(openai_messages) and (
             openai_messages[0]["role"] == "tool"
-            or num_messages_tokens_openai(openai_messages, self._model) > available_tokens
+            or num_messages_tokens_openai(openai_messages, self._model)
+            > available_tokens
         ):
             if len(self._context) > 0:
                 self._context.pop(0)
@@ -380,17 +411,29 @@ class Context:
         if self._context_file and os.path.exists(self._context_file):
             os.remove(self._context_file)
 
-    def __merge_messages(self, left: MessageType, right: MessageType) -> MessageType | None:
+    def __merge_messages(
+        self, left: MessageType, right: MessageType
+    ) -> MessageType | None:
         if left["role"] == "assistant" and right["role"] == "assistant":
-            merged_content = (left.get("content", "") + "\n\n" + right.get("content", "")).strip()
+            merged_content = (
+                left.get("content", "") + "\n\n" + right.get("content", "")
+            ).strip()
             merged_tool_calls = left.get("tool_calls", []) + right.get("tool_calls", [])
-            return MessageAssistant(role="assistant", content=merged_content, tool_calls=merged_tool_calls)
+            return MessageAssistant(
+                role="assistant", content=merged_content, tool_calls=merged_tool_calls
+            )
         elif left["role"] == "user" and right["role"] == "user":
             if left["name"] != right["name"]:
                 return None  # Cannot merge user messages with different names.
-            return MessageUser(role="user", name=left["name"], content=left["content"] + "\n\n" + right["content"])
+            return MessageUser(
+                role="user",
+                name=left["name"],
+                content=left["content"] + "\n\n" + right["content"],
+            )
         elif left["role"] == "system" and right["role"] == "system":
-            return MessageSystem(role="system", content=left["content"] + "\n\n" + right["content"])
+            return MessageSystem(
+                role="system", content=left["content"] + "\n\n" + right["content"]
+            )
         else:
             # Either different roles or tool messages, cannot merge.
             return None
@@ -402,18 +445,20 @@ class Context:
         message["msg_timestamp"] = datetime.now(tz=timezone.utc).isoformat()
         self._context.append(message)
         if self._context_file:
-            with jsonlines.open(self._context_file, "a") as file:  # type: ignore
-                file.write(message)
+            with jsonlines.open(self._context_file, "a") as file:
+                _ = file.write(message)
 
     def __system_message(self, content: str) -> MessageSystem:
         return {"role": "system", "content": content}
 
     @staticmethod
-    def __msg_to_openai(message: MessageType) -> Generator[ChatCompletionMessageParam, None, None]:
+    def __msg_to_openai(
+        message: MessageType,
+    ) -> Generator[ChatCompletionMessageParam, None, None]:
         if message["role"] == "assistant":
-            assert (
-                "tool_calls" in message or "content" in message
-            ), "Assistant message must have either tool_calls or content."
+            assert "tool_calls" in message or "content" in message, (
+                "Assistant message must have either tool_calls or content."
+            )
             if "tool_calls" in message and "content" in message:
                 yield {
                     "role": "assistant",

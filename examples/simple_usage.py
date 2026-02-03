@@ -11,7 +11,7 @@ sys.path.insert(0, parent_directory)
 API_KEY = "YOUR API KEY HERE"
 
 
-def callback(sentence: str, response_done: bool):
+def callback(sentence: str, response_done: bool) -> None:
     """Callback function to handle responses from the GPT model.
 
     The library tries to segment the response into full sentences terminated by ASCII period (.)
@@ -26,7 +26,7 @@ def callback(sentence: str, response_done: bool):
     print(f"Assistant: {sentence} (response_done: {response_done})")
 
 
-async def main():
+async def main() -> None:
     from pygptlink.context import Context
     from pygptlink.completion_openai import CompletionOpenAI
 

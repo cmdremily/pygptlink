@@ -36,7 +36,9 @@ class OpenAICompletionMerger:
         for chunk_choice in chunk.choices:
             assert (
                 not chunk_choice.delta.role or chunk_choice.delta.role == "assistant"
-            ), f"Expected role 'assistant', got {chunk_choice.delta.role} in chunk {chunk.id}."
+            ), (
+                f"Expected role 'assistant', got {chunk_choice.delta.role} in chunk {chunk.id}."
+            )
             if len(self.__completion.choices) <= chunk_choice.index:
                 # New choice, create minimal structure, filled in later
                 self.__completion.choices.append(
@@ -70,11 +72,18 @@ class OpenAICompletionMerger:
                             type="function",
                         )
                     )
-                result_tool_call = result_choice.message.tool_calls[delta_toolcall.index]
-                result_tool_call.id = self.__append_or_not(result_tool_call.id, delta_toolcall.id) or ""
+                result_tool_call = result_choice.message.tool_calls[
+                    delta_toolcall.index
+                ]
+                result_tool_call.id = (
+                    self.__append_or_not(result_tool_call.id, delta_toolcall.id) or ""
+                )
                 if delta_toolcall.function:
                     result_tool_call.function.name = (
-                        self.__append_or_not(result_tool_call.function.name, delta_toolcall.function.name) or ""
+                        self.__append_or_not(
+                            result_tool_call.function.name, delta_toolcall.function.name
+                        )
+                        or ""
                     )
                     result_tool_call.function.arguments = (
                         self.__append_or_not(

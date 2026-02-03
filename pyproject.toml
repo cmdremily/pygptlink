@@ -28,5 +28,6 @@ strict = true
 [dependency-groups]
 dev = [
     "coverage~=7.10.0",
+    "mypy>=1.19.1",
     "ruff>=0.14.14",
 ]
