@@ -327,7 +327,7 @@ class Context:
         return chat
 
     def _splice_sticky_messages(
-        self, sticky_system_message: str | None = None
+            self, messages: list[MessageType], sticky_system_message: str | None = None
     ) -> list[MessageType]:
         if self._persona_file:
             with open(self._persona_file, "r") as file:
@@ -338,7 +338,7 @@ class Context:
         # Find split point
         left_split: list[MessageType] = []
         right_split: list[MessageType] = []
-        for entry in reversed(self._context):
+        for entry in reversed(messages):
             if not right_split:
                 right_split.append(entry)
             elif right_split[-1]["role"] == "tool":
@@ -386,11 +386,12 @@ class Context:
         Returns:
             list[dict]: A "messages" structure, a list of "message" dicts.
         """
-        spliced_messages = self._splice_sticky_messages(sticky_system_message)
         openai_messages: list[ChatCompletionMessageParam] = []
-        for x in self._combine_messages(spliced_messages):
+        for x in self._combine_messages(self._context):
             for y in self.__msg_to_openai(x):
                 openai_messages.append(y)
+
+        openai_messages = self._splice_sticky_messages(openai_messages, sticky_system_message)
 
         available_tokens = (
             self._max_tokens - self._max_response_tokens - reserved_tokens
